@@ -1,0 +1,483 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0"
+    />
+    <title>KINDLE CLOCK</title>
+    <link
+      href="https://fonts.font.im/css2?family=Julius+Sans+One"
+      rel="stylesheet"
+    />
+    <style>
+      /* style 1: hide motto widget */
+      .style-remove-motto #motto {
+        display: none;
+      }
+      /* style 2: hide motto widget, rotate 90deg, larger text */
+      .style-rotate90 {
+        -webkit-transform: rotate(90deg);
+        transform: rotate(90deg);
+      }
+      .style-larger-time #time {
+        font-size: 13rem;
+      }
+      /* style 3: hide motto widget, rotate -90deg, larger text */
+      .style-rotate270 {
+        -webkit-transform: rotate(270deg);
+        transform: rotate(270deg);
+      }
+      /* style 4: zen mode */
+      .style-remove-date #date {
+        display: none;
+      }
+      .style-remove-tips {
+        display: none;
+        background: #ffffff;
+      }
+    </style>
+    <style>
+      html,
+      body {
+        color: #000000;
+        font-family: "Julius Sans One", sans-serif;
+        background-color: #ffffff;
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+      }
+      .page {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        /* background-color: aquamarine; */
+      }
+      #time,
+      #date {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        margin: auto;
+        text-align: center;
+      }
+      #time {
+        top: 0;
+        height: 40%;
+        font-size: 10rem;
+        font-weight: 700;
+      }
+      #date {
+        height: 30%;
+        font-size: 5rem;
+      }
+      #motto {
+        height: 30%;
+        text-align: center;
+        font-size: 1.8rem;
+        line-height: 3rem;
+      }
+      a {
+        display: none;
+      }
+      #tips {
+        height: 100%;
+        text-align: center;
+        font-size: 1.8rem;
+        line-height: 3rem;
+        position: absolute;
+        width: 100%;
+        margin: 0 auto;
+      }
+      #tips-title {
+        font-size: 13rem;
+        font-weight: 700;
+      }
+    </style>
+    <script>
+      var _hmt = _hmt || [];
+      (function () {
+        var hm = document.createElement("script");
+        hm.src = "https://hm.baidu.com/hm.js?035a58fc3c2febf54b86c3ff3c8719ff";
+        var s = document.getElementsByTagName("script")[0];
+        s.parentNode.insertBefore(hm, s);
+      })();
+    </script>
+  </head>
+
+  <body scroll="no">
+    <div class="tips style-remove-tips" id="tips">
+      <div class="tips-title" id="tips-title"></div>
+      <div class="tips-content" id="tips-content"></div>
+    </div>
+    <div class="page" id="page">
+      <div class="time" id="time" onclick="changeStyle()"></div>
+      <div class="date" id="date" onclick="clock_toggle()"></div>
+      <div class="motto" id="motto" onclick="setMotto()"></div>
+    </div>
+
+    <script
+      type="text/javascript"
+      src="https://cdn.jsdelivr.net/npm/eligrey-classlist-js-polyfill@1.2.20171210/classList.min.js"
+    ></script>
+    <script>
+      var last_time;
+      var last_flash;
+      var interval_id;
+      var style = 0;
+      var timezone = 8;
+      var clock_running = false;
+      var motto = "";
+      var zenmode_running = false;
+      var zenmode_time;
+      var zenmode_relax_time;
+      var zenmode_interval_id;
+      var zenmode_relax_interval_id;
+      var zenmode_totaltime = 0;
+      const timeDiv = document.getElementById("time");
+      const dateDiv = document.getElementById("date");
+      const pageDiv = document.getElementById("page");
+      const mottoDiv = document.getElementById("motto");
+      const tipsDiv = document.getElementById("tips");
+      const tipsTitleDiv = document.getElementById("tips-title");
+      const tipsContentDiv = document.getElementById("tips-content");
+      const halt = "HALT";
+      const zenTime = 50;
+      const zenRelaxTime = 10;
+      const TIME_INTE = 60000;
+
+      function clock_toggle() {
+        if (clock_running) {
+          clock_stop();
+        } else {
+          clock_start();
+        }
+        _hmt.push(["_trackEvent", "kindle", "halt_change", clock_running]);
+      }
+
+      function clock_start() {
+        console.log("clock start");
+        if (clock_running) return;
+        clock_running = true;
+        last_time = 0;
+        updateTime();
+        clearInterval(interval_id);
+        interval_id = setInterval("updateTime()", TIME_INTE);
+      }
+
+      function clock_stop() {
+        console.log("clock done");
+        clock_running = false;
+        clearInterval(interval_id);
+        timeDiv.innerHTML = halt;
+      }
+
+      function setWidgetHeight(base, timeHeight, dateHeight, mottoHeight) {
+        timeDiv.style.height = base * timeHeight + "px";
+        timeDiv.style.lineHeight = base * timeHeight + "px";
+        dateDiv.style.height = base * dateHeight + "px";
+        dateDiv.style.lineHeight = base * dateHeight + "px";
+        mottoDiv.style.height = base * mottoHeight + "px";
+      }
+
+      function setPage(width, height, top, left) {
+        pageDiv.style.width = width + "px";
+        pageDiv.style.height = height + "px";
+        pageDiv.style.top = top + "px";
+        pageDiv.style.left = left + "px";
+      }
+
+      function zenModeStart() {
+        console.log("zen start");
+        if (zenmode_running) return;
+        zenmode_time = zenTime;
+        updateZenTime();
+        clearInterval(zenmode_interval_id);
+        clearInterval(zenmode_relax_interval_id);
+        zenmode_interval_id = setInterval("updateZenTime()", TIME_INTE);
+        zenmode_running = true;
+      }
+
+      function zenModeStop() {
+        console.log("zen done");
+        zenmode_running = false;
+        clearInterval(zenmode_interval_id);
+        clearInterval(zenmode_relax_interval_id);
+        setMotto();
+        if (zenmode_totaltime > 0) {
+          _hmt.push([
+            "_trackEvent",
+            "kindle",
+            "zenmode_totaltime",
+            zenmode_totaltime,
+          ]);
+        }
+      }
+
+      function zenModeToggle() {
+        if (zenmode_running == false) {
+          zenModeStart();
+        } else {
+          zenModeStop();
+        }
+      }
+
+      function updateZenTime() {
+        timeDiv.innerHTML = zenmode_time;
+        if (zenmode_time == 0) {
+          console.log("zenmode:relax");
+          zenmode_relax_time = zenRelaxTime;
+          flash(1000);
+          updateZenRelaxTime();
+          clearInterval(zenmode_relax_interval_id);
+          clearInterval(zenmode_interval_id);
+          zenmode_relax_interval_id = setInterval(
+            "updateZenRelaxTime()",
+            TIME_INTE,
+          );
+        } else {
+          setMotto("ZEN MODE: CONCENTRATE");
+          zenmode_time--;
+          zenmode_totaltime++;
+        }
+      }
+
+      function updateZenRelaxTime() {
+        timeDiv.innerHTML = zenmode_relax_time;
+        if (zenmode_relax_time == 0) {
+          console.log("zenmode concentrate");
+          zenmode_time = zenTime;
+          flash(1000);
+          updateZenTime();
+          clearInterval(zenmode_relax_interval_id);
+          clearInterval(zenmode_interval_id);
+          zenmode_interval_id = setInterval("updateZenTime()", TIME_INTE);
+        } else {
+          setMotto("ZEN MODE: RELAX");
+          zenmode_relax_time--;
+        }
+      }
+
+      function changeStyle() {
+        var clientHeight = document.documentElement.clientHeight;
+        var clientWidth = document.documentElement.clientWidth;
+        switch (style) {
+          case 1:
+          case "1":
+            saveStyle(style);
+            pageDiv.classList.remove("style-smaller-motto");
+            pageDiv.classList.add("style-remove-motto");
+            setWidgetHeight(clientHeight, 0.7, 0.3, 0);
+            style = 2;
+            break;
+          case 2:
+          case "2":
+            saveStyle(style);
+            pageDiv.classList.add("style-rotate270");
+            pageDiv.classList.add("style-larger-time");
+            pageDiv.classList.add("style-remove-motto");
+            setWidgetHeight(clientWidth, 0.7, 0.3, 0);
+            var bais = (clientHeight - clientWidth) / 2;
+            setPage(clientHeight, clientWidth, bais, -bais);
+            // hack for kindle 1
+            timeDiv.innerHTML = "";
+            setTimeout("style = 22; changeStyle();", 1);
+            break;
+          case 22:
+            timeDiv.innerHTML = last_time;
+            // hack for kindle 1 done
+            style = 3;
+            break;
+          case 3:
+          case "3":
+            saveStyle(style);
+            pageDiv.classList.remove("style-rotate270");
+            pageDiv.classList.add("style-larger-time");
+            pageDiv.classList.add("style-remove-motto");
+            setWidgetHeight(clientWidth, 0.7, 0.3, 0);
+            var bais = (clientHeight - clientWidth) / 2;
+            // hack for kindle 2
+            setPage(clientHeight * 0.5, clientWidth * 0.5, bais, -bais);
+            setTimeout("style = 33; changeStyle();", 1);
+            break;
+          case 33:
+            timeDiv.innerHTML = "";
+            pageDiv.classList.add("style-rotate90");
+            setPage(clientHeight, clientWidth, bais, -bais);
+            setTimeout("style = 333; changeStyle();", 1);
+            break;
+          case 333:
+            timeDiv.innerHTML = last_time;
+            // hack for kindle 2 done
+            style = 4;
+            break;
+          case 4:
+          case "4":
+            saveStyle(style);
+            pageDiv.classList.remove("style-rotate90");
+            pageDiv.classList.remove("style-remove-motto");
+            pageDiv.classList.add("style-remove-date");
+            pageDiv.classList.add("style-default");
+            setWidgetHeight(clientHeight, 0.7, 0, 0.3);
+            setPage(clientWidth, clientHeight, 0, 0);
+            clock_stop();
+            zenModeStart();
+            // hack for kindle 3
+            timeDiv.innerHTML = "";
+            setTimeout("style = 44; changeStyle();", 1);
+            break;
+          case 44:
+            timeDiv.innerHTML = zenTime;
+            // hack for kindle 3 done
+            style = 5;
+            break;
+          case 5:
+          case "5":
+            saveStyle(style);
+            pageDiv.classList.remove("style-larger-time");
+            pageDiv.classList.remove("style-remove-date");
+            zenModeStop();
+          default:
+            setWidgetHeight(clientHeight, 0.4, 0.3, 0.3);
+            style = 1;
+            clock_start();
+        }
+      }
+
+      function fontSizeAutoChange() {
+        var clientHeight = document.documentElement.clientHeight;
+        var clientWidth = document.documentElement.clientWidth;
+        tipsDiv.style.width = clientWidth + "px";
+        tipsDiv.style.height = clientHeight + "px";
+        tipsTitleDiv.style.height = clientHeight * 0.5 + "px";
+        tipsTitleDiv.style.lineHeight = clientHeight * 0.5 + "px";
+        document.documentElement.style.fontSize = clientHeight / 40 + "px";
+      }
+
+      function getQueryVariable(variable) {
+        var query = window.location.search.substring(1);
+        var vars = query.split("&");
+        for (var i = 0; i < vars.length; i++) {
+          var pair = vars[i].split("=");
+          if (pair[0] == variable) {
+            return decodeURI(pair[1]);
+          }
+        }
+        return false;
+      }
+
+      function updateTime() {
+        var date = new Date();
+        var utc8DiffMinutes = date.getTimezoneOffset() + timezone * 60;
+        date.setMinutes(date.getMinutes() + utc8DiffMinutes);
+        if (date.getMinutes() == 0 && date.getHours() != last_flash) {
+          last_flash = date.getHours();
+          flash(1000);
+        }
+        var timeString =
+          date.getHours() + ":" + ("0" + date.getMinutes()).slice(-2);
+        var dateString = date.getMonth() + 1 + "/" + date.getDate();
+        var weekList = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+        var weekString = weekList[date.getDay()];
+        if (last_time != timeString) {
+          timeDiv.innerHTML = timeString;
+          dateDiv.innerHTML = dateString + " " + weekString;
+        }
+        last_time = timeString;
+      }
+
+      function flash(time) {
+        document.body.style.backgroundColor = "#000";
+        setTimeout("document.body.style.backgroundColor = '#FFF';", time);
+      }
+
+      String.prototype.replaceAll = function (targetStr, newStr) {
+        var sourceStr = this.valueOf();
+        while (sourceStr.indexOf(targetStr) !== -1) {
+          sourceStr = sourceStr.replace(targetStr, newStr);
+        }
+        return sourceStr;
+      };
+
+      function showTips(title, content, time) {
+        tipsTitleDiv.innerHTML = title;
+        content = content.replaceAll("\n", "<br/>");
+        tipsContentDiv.innerHTML = content;
+        pageDiv.style.display = "none";
+        tipsDiv.classList.remove("style-remove-tips");
+        setTimeout(
+          "pageDiv.style.display = 'block'; tipsDiv.classList.add('style-remove-tips');",
+          time,
+        );
+      }
+
+      function setMotto(text) {
+        var motto_list = [
+          "Pain past is pleasure.",
+          "While there is life, there is hope.",
+          "Wisdom in the mind is better than\\nmoney in the hand.",
+          "Storms make trees take deeper roots.",
+          "Patience is bitter,\\nbut its fruit is sweet.\\n----Rousseau",
+          "Nothing is impossible for\\na willing heart.",
+          "The shortest answer is doing.",
+          "All things are difficult befor\\nthey are easy.",
+          "Great hopes make great man.",
+        ];
+        if (!text) {
+          text = motto;
+          if (motto == "") {
+            var index = Math.floor(Math.random() * motto_list.length);
+            text = motto_list[index];
+          }
+        }
+
+        text = text.replaceAll("\\n", "<br/>");
+        mottoDiv.innerHTML = text;
+      }
+
+      function saveStyle(s) {
+        var cookie = "style=" + s + "; expires=Thu, 18 Dec 2043 12:00:00 GMT";
+        document.cookie = cookie;
+        _hmt.push(["_trackEvent", "kindle", "style", s]);
+      }
+
+      function getCookieStyle() {
+        var name = "style=";
+        var ca = document.cookie.split(";");
+        for (var i = 0; i < ca.length; i++) {
+          var c = ca[i].trim();
+          if (c.indexOf(name) == 0) return c.substring(name.length, c.length);
+        }
+        return 0;
+      }
+
+      flash(100);
+      motto = getQueryVariable("motto") ? getQueryVariable("motto") : "";
+      setMotto();
+      timezone = getQueryVariable("timezone")
+        ? getQueryVariable("timezone")
+        : 8;
+      style = getQueryVariable("style")
+        ? getQueryVariable("style")
+        : getCookieStyle()
+        ? getCookieStyle()
+        : 0;
+      if (style == 0) {
+        showTips(
+          "TIPS",
+          "try these urls:\n/clock?timezone=+10&style=3\n/clock?motto=hello\\nworld\ntips closing in 10s",
+          10000,
+        );
+      }
+      clock_start();
+      changeStyle();
+      fontSizeAutoChange();
+      window.onresize = fontSizeAutoChange;
+      if (timezone != 8) {
+        _hmt.push(["_trackEvent", "kindle", "timezone", timezone]);
+      }
+    </script>
+  </body>
+</html>
